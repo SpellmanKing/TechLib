@@ -1,12 +1,44 @@
 #include <stdio.h>
 #include <string.h>
+
 #include "livro.h"
 #include "leitor.h"
 
-#define MAX_LIVROS 100
-#define MAX_EMPRESTIMOS 100
+static int validarIndiceLeitor(int idLeitor) {
+    return (idLeitor >= 0 && idLeitor < MAX_LEITORES);
+}
 
-#define RESET_CURSOR "\033[H"
+static Livro* buscarLivroPorId(int idLivro) {
+    for (int i = 0; i < totalLivros; i++) {
+        if (livros[i].id == idLivro) {
+            return &livros[i];
+        }
+    }
+    return NULL;
+}
+
+static Emprestimo* buscarEmprestimoAtivoPorLivroId(int idLivro) {
+    for (int i = 0; i < totalEmprestimos; i++) {
+        if (emprestimos[i].idLivro == idLivro) {
+            return &emprestimos[i];
+        }
+    }
+    return NULL;
+}
+
+static int existeEmprestimoAtivoParaLivro(int idLivro) {
+    return buscarEmprestimoAtivoPorLivroId(idLivro) != NULL;
+}
+
+static void esperarVoltar(void) {
+    int op;
+    printf("\nDigite 0 para voltar: ");
+    while (scanf("%d", &op) != 1 || op != 0) {
+        printf("Entrada invalida! Digite 0: ");
+        while (getchar() != '\n') {}
+    }
+    getchar();
+}
 
 Livro livros[MAX_LIVROS] = {
     {1, "Alice no pais das maravilhas", "Lewis Carroll", 1},
@@ -16,175 +48,232 @@ Livro livros[MAX_LIVROS] = {
     {5, "Chapeuzinho vermelho", "Charles Perrault", 1}
 };
 
-typedef struct {
-    int idLivro;
-    int idLeitor;
-    char usuario[50];
-    int dias;
-} Emprestimo;
-
-Livro livros[MAX_LIVROS];
 Emprestimo emprestimos[MAX_EMPRESTIMOS];
 
 int totalLivros = 5;
 int totalEmprestimos = 0;
 
-void cadastrarLivro() {
+void cadastrarLivro(void) {
+    if (totalLivros >= MAX_LIVROS) {
+        printf("\nLimite de livros atingido!\n");
+        esperarVoltar();
+        return;
+    }
+
     Livro l;
 
     printf("\nID: ");
-    scanf("%d", &l.id);
+    if (scanf("%d", &l.id) != 1) {
+        while (getchar() != '\n') {}
+        printf("Entrada invalida!\n");
+        esperarVoltar();
+        return;
+    }
     getchar(); // limpa buffer
 
     printf("Titulo: ");
-    fgets(l.titulo, sizeof(l.titulo), stdin);
+    if (!fgets(l.titulo, sizeof(l.titulo), stdin)) {
+        printf("Erro lendo titulo!\n");
+        esperarVoltar();
+        return;
+    }
     l.titulo[strcspn(l.titulo, "\n")] = '\0';
 
     printf("Autor: ");
-    fgets(l.autor, sizeof(l.autor), stdin);
+    if (!fgets(l.autor, sizeof(l.autor), stdin)) {
+        printf("Erro lendo autor!\n");
+        esperarVoltar();
+        return;
+    }
     l.autor[strcspn(l.autor, "\n")] = '\0';
 
     l.disponivel = 1;
     livros[totalLivros++] = l;
 
     printf("Livro cadastrado!\n");
+    esperarVoltar();
 }
 
-void esperarVoltar() {
-    int op;
-
-    printf("\nDigite 0 para voltar: ");
-
-    while (scanf("%d", &op) != 1 || op != 0) {
-        printf("Entrada invalida! Digite 0: ");
-        while(getchar() != '\n');
-    }
-
-    getchar(); 
-}
-
-void listarLivros() {
+void listarLivros(void) {
     printf("\n===== LIVROS =====\n");
 
     for (int i = 0; i < totalLivros; i++) {
-        printf("ID: %d\n", livros[i].id);
+        printf("\nID: %d\n", livros[i].id);
         printf("Titulo: %s\n", livros[i].titulo);
         printf("Autor: %s\n", livros[i].autor);
 
         if (livros[i].disponivel) {
-            printf("Status: Disponivel\n\n");
+            printf("Status: Disponivel\n");
         } else {
-            
-           for (int j = 0; j < totalEmprestimos; j++) {
-            if (emprestimos[j].idLivro == livros[i].id) {
-
-            int idLeitor = emprestimos[j].idLeitor;
-            printf("Status: Emprestado para %s\n\n",
-            leitores[idLeitor].nome);
-    }
-}
+            Emprestimo *e = buscarEmprestimoAtivoPorLivroId(livros[i].id);
+            if (e && validarIndiceLeitor(e->idLeitor)) {
+                printf("Status: Emprestado para %s\n", leitores[e->idLeitor].nome);
+            } else {
+                printf("Status: Indisponivel\n");
+            }
         }
     }
 
     esperarVoltar();
 }
 
-void emprestarLivro() {
-    int idLivro, idLeitor;
+void emprestarLivro(void) {
+    int idLivro;
+    int idLeitor;
 
     printf("\nID do livro: ");
-    scanf("%d", &idLivro);
+    if (scanf("%d", &idLivro) != 1) {
+        while (getchar() != '\n') {}
+        printf("Entrada invalida!\n");
+        esperarVoltar();
+        return;
+    }
     getchar();
+
+    Livro *l = buscarLivroPorId(idLivro);
+    if (!l) {
+        printf("Livro nao encontrado!\n");
+        esperarVoltar();
+        return;
+    }
+
+    if (!l->disponivel) {
+        printf("Livro indisponivel!\n");
+        esperarVoltar();
+        return;
+    }
+
+    if (existeEmprestimoAtivoParaLivro(idLivro)) {
+        printf("Ja existe um emprestimo ativo para este livro!\n");
+        esperarVoltar();
+        return;
+    }
+
+    if (totalEmprestimos >= MAX_EMPRESTIMOS) {
+        printf("Limite de emprestimos atingido!\n");
+        esperarVoltar();
+        return;
+    }
 
     listarLeitores();
 
-    printf("Escolha o leitor: ");
-    scanf("%d", &idLeitor);
+    printf("\nEscolha o leitor (ID): ");
+    if (scanf("%d", &idLeitor) != 1) {
+        while (getchar() != '\n') {}
+        printf("Entrada invalida!\n");
+        esperarVoltar();
+        return;
+    }
     getchar();
 
-    for (int i = 0; i < totalLivros; i++) {
-        if (livros[i].id == idLivro && livros[i].disponivel) {
-
-            livros[i].disponivel = 0;
-
-            emprestimos[totalEmprestimos].idLivro = idLivro;
-            emprestimos[totalEmprestimos].idLeitor = idLeitor;
-            emprestimos[totalEmprestimos].dias = 0;
-
-            totalEmprestimos++;
-
-            printf("Emprestimo realizado!\n");
-            return;
-        }
+    if (!validarIndiceLeitor(idLeitor)) {
+        printf("Leitor invalido!\n");
+        esperarVoltar();
+        return;
     }
 
-    printf("Livro indisponivel!\n");
+    l->disponivel = 0;
+    emprestimos[totalEmprestimos].idLivro = idLivro;
+    emprestimos[totalEmprestimos].idLeitor = idLeitor;
+    emprestimos[totalEmprestimos].dias = 0;
+    totalEmprestimos++;
+
+    printf("Emprestimo realizado!\n");
+    esperarVoltar();
 }
 
-void renovarEmprestimo() {
-    int id;
+void renovarEmprestimo(void) {
+    int idLivro;
+    int novosDias;
 
     printf("\nID do livro: ");
-    scanf("%d", &id);
+    if (scanf("%d", &idLivro) != 1) {
+        while (getchar() != '\n') {}
+        printf("Entrada invalida!\n");
+        esperarVoltar();
+        return;
+    }
     getchar();
 
-    for (int i = 0; i < totalEmprestimos; i++) {
-        if (emprestimos[i].idLivro == id) {
-            printf("Emprestimo renovado!\n");
-            return;
-        }
+    Emprestimo *e = buscarEmprestimoAtivoPorLivroId(idLivro);
+    if (!e) {
+        printf("Emprestimo nao encontrado!\n");
+        esperarVoltar();
+        return;
     }
 
-    printf("Nao encontrado!\n");
-}
-
-void devolucao(){
-    int id;
-
-    printf("\nID do livro: ");
-    scanf("%d", &id);
+    printf("Quantos dias deseja renovar (incremento)? ");
+    if (scanf("%d", &novosDias) != 1 || novosDias < 0) {
+        while (getchar() != '\n') {}
+        printf("Valor invalido!\n");
+        esperarVoltar();
+        return;
+    }
     getchar();
 
+    e->dias += novosDias;
+    printf("Emprestimo renovado! Agora com %d dias.\n", e->dias);
+    esperarVoltar();
+}
+
+void devolucao(void) {
+    int idLivro;
+
+    printf("\nID do livro: ");
+    if (scanf("%d", &idLivro) != 1) {
+        while (getchar() != '\n') {}
+        printf("Entrada invalida!\n");
+        esperarVoltar();
+        return;
+    }
+    getchar();
+
+    Emprestimo *e = buscarEmprestimoAtivoPorLivroId(idLivro);
+    if (!e) {
+        printf("Emprestimo nao encontrado!\n");
+        esperarVoltar();
+        return;
+    }
+
+    int idLeitor = e->idLeitor;
+    int dias = e->dias;
+
+    if (validarIndiceLeitor(idLeitor) && dias > 7) {
+        float multa = (dias - 7) * 2.0f;
+        leitores[idLeitor].dividas += multa;
+        printf("Multa aplicada: R$ %.2f\n", multa);
+    }
+
+    Livro *l = buscarLivroPorId(idLivro);
+    if (l) {
+        l->disponivel = 1;
+    }
+
+    // remover empréstimo ativo do array (compactar)
     for (int i = 0; i < totalEmprestimos; i++) {
-        if (emprestimos[i].idLivro == id) {
-
-            int leitor = emprestimos[i].idLeitor;
-            int dias = emprestimos[i].dias;
-
-            if (dias > 7) {
-                float multa = (dias - 7) * 2.0;
-                leitores[leitor].dividas += multa;
-
-                printf("Multa aplicada: R$ %.2f\n", multa);
-            }
-
-            for (int j = 0; j < totalLivros; j++) {
-                if (livros[j].id == id) {
-                    livros[j].disponivel = 1;
-                }
-            }
-
+        if (emprestimos[i].idLivro == idLivro) {
             for (int k = i; k < totalEmprestimos - 1; k++) {
                 emprestimos[k] = emprestimos[k + 1];
             }
-
             totalEmprestimos--;
-
-            printf("Livro devolvido!\n");
-            return;
+            break;
         }
     }
 
-    printf("Emprestimo nao encontrado!\n");
+    printf("Livro devolvido!\n");
+    esperarVoltar();
 }
 
-
-void avancarDias() {
-
+void avancarDias(void) {
     int dias;
 
-    printf("Quantos dias avancar? ");
-    scanf("%d", &dias);
+    printf("\nQuantos dias avancar? ");
+    if (scanf("%d", &dias) != 1 || dias < 0) {
+        while (getchar() != '\n') {}
+        printf("Valor invalido!\n");
+        esperarVoltar();
+        return;
+    }
     getchar();
 
     for (int i = 0; i < totalEmprestimos; i++) {
@@ -192,4 +281,6 @@ void avancarDias() {
     }
 
     printf("Tempo avancado!\n");
+    esperarVoltar();
 }
+

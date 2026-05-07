@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 #include "menu.h"
 #include "livro.h"
 #include "utils.h"
@@ -12,8 +13,8 @@ void menu() {
         printf("2 - Listar Livros\n");
         printf("3 - Emprestar Livro\n");
         printf("4 - Renovar Emprestimo\n");
-        printf("5 - Devolução de Livros\n");
-        printf("6 - Avançar Dias\n");
+        printf("5 - Devolucao de Livros\n");
+        printf("6 - Avancar Dias\n");
         printf("0 - Sair\n");
         printf("Escolha: ");
 
@@ -24,14 +25,16 @@ void menu() {
             continue;
         }
 
-        switch(op) {
+        switch (op) {
             case 1: cadastrarLivro(); break;
             case 2: listarLivros(); break;
             case 3: emprestarLivro(); break;
             case 4: renovarEmprestimo(); break;
-            case 5: devolucao();break;
-            case 6: avancarDias();break;
+            case 5: devolucao(); break;
+            case 6: avancarDias(); break;
+            default: break;
         }
 
-    } while(op != 0);
+    } while (op != 0);
 }
+
